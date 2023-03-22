@@ -13,118 +13,47 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.JsonObjectRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.util.HashMap;
+import java.util.jar.JarException;
+
 public class LoginActivity extends AppCompatActivity {
     Button button;
-    
-    public static final String SHARED_PREFS = "sharedPrefs";
-    ProgressBar progressBar;
-    DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReferenceFromUrl("https://foodiee-dfd2d-default-rtdb.firebaseio.com/");
+    EditText username,password;
+//    public static final String SHARED_PREFS = "sharedPrefs";
+//    ProgressBar progressBar;
+//    DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReferenceFromUrl("https://foodiee-dfd2d-default-rtdb.firebaseio.com/");
 
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        checkBox();
+        username = findViewById(R.id.email_edit_text);
+        password = findViewById(R.id.password_edit_text);
 
-        progressBar=findViewById(R.id.progress_bar);
-        final EditText username = findViewById(R.id.email_edit_text);
-        final EditText password = findViewById(R.id.password_edit_text);
-        final Button LoginBtn = findViewById(R.id.logout_btn);
 
         button = findViewById(R.id.logout_btn);
 
+
+
         button.setOnClickListener(new View.OnClickListener() {
             @Override
-            public void onClick(View v) {
-                progressBar.setVisibility(View.VISIBLE);
-                final String usernameTxt = username.getText().toString();
-                final String PasswordTxt = password.getText().toString();
-
-                if (usernameTxt.isEmpty() || PasswordTxt.isEmpty()) {
-                    Toast.makeText(LoginActivity.this, "Please enter your Username and Password", Toast.LENGTH_SHORT).show();
-                }
-                else {
-
-                    databaseReference.child("users").addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
-
-                            //check if email is existing in the db
-                            if (snapshot.hasChild(usernameTxt)){
-
-                                final String getpassword = snapshot.child(usernameTxt).child("password").getValue(String.class);
-
-                                if (getpassword.equals(PasswordTxt)){
-
-
-                                    SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
-                                    SharedPreferences.Editor editor = sharedPreferences.edit();
-
-                                    editor.putString("name","true");
-                                    editor.apply();
-
-                                    Toast.makeText(LoginActivity.this, "Successfully Logged in",Toast.LENGTH_SHORT).show();
-
-                                    //Starting student form
-
-                                    startActivity(new Intent(LoginActivity.this, MainActivity.class));
-                                    finish();
-                                }
-                                else {
-                                    progressBar.setVisibility(View.GONE);
-                                    Toast.makeText(LoginActivity.this,"Wrong Credentials",Toast.LENGTH_SHORT).show();
-                                }
-
-                            }
-//
-                        }
-
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-
-                        }
-                    });
-
-                }
-                ////////////////////////////////////////////////////////////////////////////////
-                databaseReference.child("admin").addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-
-                        //check if email is existing in the db
-                        if (snapshot.hasChild(usernameTxt)){
-
-                            final String getpassword = snapshot.child(usernameTxt).child("password").getValue(String.class);
-
-                            if (getpassword.equals(PasswordTxt)){
-                                Toast.makeText(LoginActivity.this, "Successfully Logged in admin panel",Toast.LENGTH_SHORT).show();
-
-                                //Starting student form
-                                startActivity(new Intent(LoginActivity.this, Adminhome.class));
-                                finish();
-                            }
-//                                                      Toast.makeText(login.this," ",Toast.LENGTH_SHORT).show();
-                            else {
-                                Toast.makeText(LoginActivity.this,"Incorrect username or password",Toast.LENGTH_SHORT).show();
-                            }
-                        }
-//
-                    }
-
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-
-                    }
-                });
-                ////////////////////////////////////////////////////////////////////////////////
+            public void onClick(View view) {
+                authenticatUser();
             }
         });
 
@@ -137,19 +66,82 @@ public class LoginActivity extends AppCompatActivity {
                 startActivity(new Intent(LoginActivity.this, CreateAccountActivity.class));
             }
         });
+    }
 
+    public void authenticatUser() {
+        if (!validateusername() || !validatePassword()) {
+            return;
+        }
+
+        RequestQueue queue = Volley.newRequestQueue(LoginActivity.this);
+        // The URL For Posting
+        String url = "http://10.4.7.238:9080/api/v1/user/login";
+
+
+        // Get Parameters:
+        HashMap<String, String> params = new HashMap<String, String>();
+        params.put("email", username.getText().toString());
+        params.put("password", password.getText().toString());
+
+
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, new JSONObject(params), new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject response) {
+
+                try {
+
+                    String email = (String) response.get("email");
+                    String password = (String) response.get("password");
+
+
+
+                    startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                    finish();
+
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                    System.out.println(e.getMessage());
+                }
+                //
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                error.printStackTrace();
+                System.out.println(error.getMessage());
+
+                Toast.makeText(LoginActivity.this, "Login Failed", Toast.LENGTH_SHORT).show();
+            }
+        });
+
+        queue.add(jsonObjectRequest);
 
 
 
     }
+    public boolean validateusername() {
+        String Username = username.getText().toString();
 
-    private void checkBox() {
-        SharedPreferences sharedPreferences = getSharedPreferences(SHARED_PREFS, MODE_PRIVATE);
-        String check = sharedPreferences.getString("name", "");
-        if(check.equals("true")){
-            startActivity(new Intent(LoginActivity.this, MainActivity.class));
-            finish();
-
+        if(Username.isEmpty()){
+            username.setError("Email Cannot be empty");
+            return false;
+        }else {
+            username.setError(null);
+            return true;
         }
     }
+    public boolean validatePassword() {
+        String Password = password.getText().toString();
+
+        if(Password.isEmpty()){
+            password.setError("Password must be filled");
+            return false;
+        }else {
+            password.setError(null);
+            return true;
+        }
+
+    }
+
 }

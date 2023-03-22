@@ -1,6 +1,7 @@
 package com.example.messfood;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Intent;
@@ -12,6 +13,13 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.android.volley.AuthFailureError;
+import com.android.volley.Request;
+import com.android.volley.RequestQueue;
+import com.android.volley.Response;
+import com.android.volley.VolleyError;
+import com.android.volley.toolbox.StringRequest;
+import com.android.volley.toolbox.Volley;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
@@ -19,79 +27,27 @@ import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.HashMap;
+import java.util.Map;
 
 public class CreateAccountActivity extends AppCompatActivity {
-
-    ProgressBar progressBar;
-    DatabaseReference databaseReference = FirebaseDatabase.getInstance().getReferenceFromUrl("https://foodiee-dfd2d-default-rtdb.firebaseio.com/");
+    EditText Email,Unique,password,confirmpassword;
+    Button registerBtn;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_create_account);
-        final EditText Email= findViewById(R.id.email_edit_text);
-        final EditText Unique= findViewById(R.id.UniqueID);
-        final EditText password = findViewById(R.id.password_edit_text);
-        final EditText confirmpassword = findViewById(R.id.confirm_password_edit_text);
+        Email= findViewById(R.id.email_edit_text);
+        Unique= findViewById(R.id.UniqueID);
+        password = findViewById(R.id.password_edit_text);
+        confirmpassword = findViewById(R.id.confirm_password_edit_text);
 
-        final Button registerBtn = findViewById(R.id.create_account_btn);
-        progressBar= findViewById(R.id.progress_bar);
+        registerBtn = findViewById(R.id.create_account_btn);
 
 
         registerBtn.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                progressBar.setVisibility(View.VISIBLE);
-                final String emailtxt = Email.getText().toString();
-                final String uniquetxt = Unique.getText().toString();
-                final String passwordtxt = password.getText().toString();
-                final String conPasswordtxt = confirmpassword.getText().toString();
-
-                //checking no feilds are empty
-                if(uniquetxt.equals("")){
-                    Unique.setError("Please enter the user ID");
-                }
-                else if(emailtxt.equals("")){
-                    Email.setError("Please enter the email ID");
-                }  else if(passwordtxt.equals("")){
-                    password.setError("Please enter the Password");
-                }
-                //check if passwords are matching with each other
-                else if (!passwordtxt.equals(conPasswordtxt)){
-                    Toast.makeText(CreateAccountActivity.this, "Passwords are not matching", Toast.LENGTH_SHORT).show();
-                }
-                else {
-
-                    databaseReference.child("users").addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot snapshot) {
-                            //check if email is already registered
-                            if (snapshot.hasChild(passwordtxt)) {
-                                Toast.makeText(CreateAccountActivity.this, "Password is already registered", Toast.LENGTH_SHORT).show();
-                            }  if (snapshot.hasChild(uniquetxt)) {
-                                progressBar.setVisibility(View.GONE);
-                                Toast.makeText(CreateAccountActivity.this, "Username is already registered", Toast.LENGTH_SHORT).show();
-                            }else {
-                                //sending data to firebase realtime database
-                                //using Username as unique identity
-
-                                databaseReference.child("users").child(uniquetxt).child("Email").setValue(emailtxt);
-                                databaseReference.child("users").child(uniquetxt).child("Unique ID").setValue(uniquetxt);
-                                databaseReference.child("users").child(uniquetxt).child("password").setValue(passwordtxt);
-                                databaseReference.child("users").child(uniquetxt).child("ConfirmPassword").setValue(conPasswordtxt);
-
-
-                                Toast.makeText(CreateAccountActivity.this, "User Registered Successfully", Toast.LENGTH_SHORT).show();
-                                finish();
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError error) {
-
-                        }
-                    });
-
-                }
+                processFormFields();
             }
         });
         TextView tv = (TextView) this.findViewById(R.id.login_text_view_btn);
@@ -106,5 +62,109 @@ public class CreateAccountActivity extends AppCompatActivity {
 
     }
 
+
+    public void processFormFields(){
+        if(!validateUnique() || !validateEmail() || !validatePassword() || !validateConPassword()){
+            return;
+        }
+
+        RequestQueue queue = Volley.newRequestQueue(CreateAccountActivity.this);
+        // The URL For Posting
+        String url = "http://10.4.7.238:9080/api/v1/user/register";
+
+        //String Request Object:
+        StringRequest stringRequest = new StringRequest(Request.Method.POST, url, new Response.Listener<String>() {
+            @Override
+            public void onResponse(String response) {
+
+                if (response.equalsIgnoreCase("Success")){
+
+                    Unique.setText(null);
+                    Email.setText(null);
+                    password.setText(null);
+
+                    Toast.makeText(CreateAccountActivity.this, "User register Successsfully", Toast.LENGTH_SHORT).show();
+
+                }
+
+
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+
+                error.printStackTrace();
+                System.out.println(error.getMessage());
+
+                Toast.makeText(CreateAccountActivity.this, "User register Not register", Toast.LENGTH_SHORT).show();
+
+            }
+        }){
+            @Nullable
+            @Override
+            protected Map<String, String> getParams() throws AuthFailureError {
+                Map<String, String> pramas = new HashMap<>();
+                pramas.put("UNIQUEID", Unique.getText().toString());
+                pramas.put("email", Email.getText().toString());
+                pramas.put("password", password.getText().toString());
+
+                return pramas;
+            }
+        };
+        queue.add(stringRequest);
+
+    }
+
+
+
+    //to check the validation of Unique id
+    public boolean validateUnique() {
+        String unique = Unique.getText().toString();
+
+        if(unique.isEmpty()){
+            Unique.setError("UniqueId must be filled");
+            return false;
+        }else {
+            Unique.setError(null);
+            return true;
+        }
+    }
+    public boolean validateEmail() {
+        String email = Email.getText().toString();
+
+        if(email.isEmpty()){
+            Email.setError("Email Cannot be empty");
+            return false;
+        }else {
+            Email.setError(null);
+            return true;
+        }
+    }
+    public boolean validatePassword() {
+        String Password = password.getText().toString();
+
+        if(Password.isEmpty()){
+            password.setError("Password must be filled");
+            return false;
+        }else {
+            password.setError(null);
+            return true;
+        }
+    }
+    public boolean validateConPassword() {
+        String ConPassword = confirmpassword.getText().toString();
+        String Password = password.getText().toString();
+        if(ConPassword.isEmpty()){
+            confirmpassword.setError("Password must be filled");
+            return false;
+        }
+        else if(!Password.equals(ConPassword)){
+            password.setError("Password Do not Matched");
+            return false;
+        }else {
+            confirmpassword.setError(null);
+            return true;
+        }
+    }
 
 }
